@@ -32,6 +32,28 @@ imu_cmp10a/   run from a terminal with the IMU connected over USB
   configure_imu_cmp10a.py    UI for output rate, baud, bandwidth, packets
 ```
 
+## Current hardware
+
+The values in the scripts are for these devices. Swap the numbers when the
+hardware changes; the scripts themselves are not tied to any model.
+
+| Sensor | Device | Values in the scripts |
+|---|---|---|
+| IMU | Yahboom CMP10A | 200 Hz, filter width 1 (module bandwidth set to 188 Hz) |
+| 2D lidar | YDLIDAR T-mini Plus, 12 m (sold by Yahboom) | 0.05–12 m (4 m on dark targets), 6 Hz, 0.54°, clockwise |
+| Depth camera | DFRobot SEN0581 (ToF) | 70° × 60°, 0.15–1.5 m, rendered at 100 × 82 |
+| RGB camera | Intel RealSense D455, colour stream | 1280 × 720, 90° × 58.7° |
+
+A few of these differ from the headline datasheet figures on purpose:
+
+- **CMP10A** ships at 10 Hz over 9600 baud. `configure_imu_cmp10a.py` raises it
+  to 200 Hz over 230400; the simulation matches the reconfigured module.
+- **SEN0581** has a 100 × 100 grid over a 70° × 60° field of view -- its pixels
+  are not square, which Isaac cannot render. It is simulated at 100 × 82 so
+  both angles stay correct.
+- **D455 colour** is quoted at 90° × 65°, but that is the full 1280 × 800
+  sensor. The 1280 × 720 stream crops it to 58.7° vertically.
+
 ## Workflow
 
 1. **Measure the real device.** For the CMP10A IMU, `measure_imu_cmp10a.py`
@@ -107,6 +129,18 @@ unless the resolution itself is a hard requirement.
 **Give each camera its own topic namespace.** Two `ROS2 Camera Info Helper`
 nodes both default to `camera_info`, and downstream code then receives
 intrinsics that alternate between two different cameras.
+
+**A datasheet field of view belongs to one resolution.** Camera datasheets
+quote the full sensor. Stream a cropped mode and the vertical angle shrinks;
+work it out from the resolution you actually use,
+`vfov = 2 * atan(height / (2 * fx))`, rather than copying the headline number.
+
+**Lidars see less far on dark surfaces.** Datasheets usually give two ranges,
+one for bright targets and a shorter one for dark ones (12 m at 80 %
+reflectivity against 4 m at 10 % for the T-mini Plus). Set only the long one
+and the simulation keeps seeing black cables and dark furniture at distances
+the real unit cannot. `dark_range_m` in `lidar_2d_calibration.py` writes the
+short one to `minReflectance` / `minReflectionRangeM`.
 
 **Set mass on the collision shapes, not the rigid body.** PhysX aggregates
 per-shape mass into the body's centre of mass and inertia tensor, which is how
