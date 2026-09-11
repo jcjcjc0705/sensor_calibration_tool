@@ -39,7 +39,8 @@ def _set(prim, name, value, log):
 
 def apply_lidar_2d(prim_path, range_min_m, range_max_m, scan_rate_hz,
                    angle_increment_deg, rotation="CW", range_accuracy_m=0.03,
-                   wavelength_nm=905.0, fov_deg=360.0):
+                   wavelength_nm=905.0, fov_deg=360.0,
+                   dark_range_m=None, dark_reflectance=0.1):
     prim = omni.usd.get_context().get_stage().GetPrimAtPath(prim_path)
     if not prim.IsValid():
         print(f"[FAIL] prim not found: {prim_path}")
@@ -58,7 +59,11 @@ def apply_lidar_2d(prim_path, range_min_m, range_max_m, scan_rate_hz,
     _set(prim, C + "scanType", "ROTARY", log)
     _set(prim, C + "nearRangeM", range_min_m, log)
     _set(prim, C + "farRangeM", range_max_m, log)
-    _set(prim, C + "minReflectionRangeM", range_max_m, log)
+    # datasheets usually give two ranges: one for bright targets and a shorter
+    # one for dark ones.  minReflectance / minReflectionRangeM model the latter.
+    _set(prim, C + "minReflectance", dark_reflectance, log)
+    _set(prim, C + "minReflectionRangeM",
+         dark_range_m if dark_range_m is not None else range_max_m, log)
     _set(prim, C + "scanRateBaseHz", scan_rate_hz, log)
     _set(prim, C + "reportRateBaseHz", report_rate, log)
     _set(prim, C + "rotationDirection", rotation, log)
@@ -88,25 +93,40 @@ def apply_lidar_2d(prim_path, range_min_m, range_max_m, scan_rate_hz,
 # -------------------------------- LIDAR 1 ------------------------------------
 apply_lidar_2d(
     prim_path           = "/World/Body/Example_Rotary_2D",  # Copy Prim Path here
-    range_min_m         = 0.05,          # range_min
-    range_max_m         = 12.0,          # range_max
-    scan_rate_hz        = 10.0,          # 1 / scan_time
-    angle_increment_deg = 0.8,           # angle_increment converted to degrees
-    rotation            = "CCW",         # "CW" clockwise / "CCW" counter-clockwise
-    range_accuracy_m    = 0.015,         # ranging accuracy
-    wavelength_nm       = 905.0,         # laser wavelength
-    fov_deg             = 360.0,         # scan field of view
+    # YDLIDAR T-mini Plus (sold by Yahboom), 12 m version.  Numbers from the
+    # official datasheet.  Sampling is fixed at 4000 points/s, so scan rate and
+    # angular resolution trade off:
+    #    6 Hz -> 0.54 deg (factory default)    8 Hz -> 0.72 deg
+    #   10 Hz -> 0.90 deg                      12 Hz -> 1.08 deg
+    # Keep scan_rate_hz equal to the "frequency" set in the real ROS driver.
+    range_min_m         = 0.05,          # 0.05 m
+    range_max_m         = 12.0,          # 12 m at 80 % reflectivity
+    dark_range_m        = 4.0,           # only 4 m at 10 % reflectivity
+    dark_reflectance    = 0.1,
+    scan_rate_hz        = 6.0,           # factory default
+    angle_increment_deg = 0.54,          # 360 / (4000 / 6)
+    rotation            = "CW",          # clockwise seen from above
+    range_accuracy_m    = 0.02,          # 20 mm
+    wavelength_nm       = 905.0,         # 905 nm
+    fov_deg             = 360.0,
 )
 
 
 # -------------------------------- LIDAR 2 ------------------------------------
-# For a second lidar, copy the block above, change the path and parameters,
-# then remove the leading "#" from each line.
+# For a second lidar, fill in the path and parameters below, then remove the
+# leading "#" from each line.  Every parameter is listed; the ones marked
+# (optional) can be deleted to keep their default.
 #
 # apply_lidar_2d(
-#     prim_path           = "/World/Body/Lidar_2",
-#     range_min_m         = 0.05,
-#     range_max_m         = 12.0,
-#     scan_rate_hz        = 10.0,
-#     angle_increment_deg = 0.8,
+#     prim_path           = "/World/Body/Lidar_2",  # Copy Prim Path here
+#     range_min_m         = 0.05,        # closest distance reported
+#     range_max_m         = 12.0,        # furthest distance, bright target
+#     dark_range_m        = 4.0,         # (optional) furthest distance, dark target
+#     dark_reflectance    = 0.1,         # (optional) reflectivity dark_range_m is for
+#     scan_rate_hz        = 6.0,         # revolutions per second
+#     angle_increment_deg = 0.54,        # 360 / (sample_rate / scan_rate_hz)
+#     rotation            = "CW",        # (optional) "CW" or "CCW", seen from above
+#     range_accuracy_m    = 0.02,        # (optional) ranging accuracy
+#     wavelength_nm       = 905.0,       # (optional) laser wavelength
+#     fov_deg             = 360.0,       # (optional) scan field of view
 # )
