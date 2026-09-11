@@ -68,7 +68,8 @@ node is not where the script expects it.
 
 1. **Set up the sensor in Isaac.** Put the sensor prim under the robot link
    that carries the rigid body so it moves with the robot, and build its
-   Action Graph (see below).
+   Action Graph. For GPS, the sensor is an Xform you create under the robot
+   body and move to where the antenna sits; the script never moves it.
 2. **Copy its path.** In the Stage panel, right-click the sensor ->
    *Copy Prim Path*, and paste it into `prim_path` in the script. Do the same
    for any graph node the script asks for (`render_product_node`,
@@ -83,52 +84,11 @@ For a second sensor of the same kind, copy the `apply_...(...)` block and
 change the path and values. Nothing is auto-discovered; a script only touches
 the prims and nodes you name.
 
-### Action Graphs
-
-The graph holds only what does not depend on the sensor model: the nodes,
-their wiring, topic names and frame ids. Everything from the datasheet is set
-by the script.
-
-| Sensor | Graph | Set in the graph |
-|---|---|---|
-| IMU | On Playback Tick -> Isaac Read IMU -> ROS2 Publish Imu; Isaac Read Simulation Time -> timeStamp | topic, frame id |
-| 2D lidar | On Playback Tick -> Isaac Create Render Product (lidar) -> ROS2 RTX Lidar Helper, type `laser_scan` | topic, frame id |
-| RGB camera | On Playback Tick -> Isaac Create Render Product (camera) -> ROS2 Camera Helper, type `rgb`, and ROS2 Camera Info Helper | topics, frame id |
-| ToF camera | as RGB, Camera Helper type `depth` | topics, frame id |
-| IR range | see below | message type, topic, frame id |
-| GPS | see below | message type, topic, frame id, orientation |
-
-Give each camera its own topic names (for example `rgb/camera_info` and
-`tof/camera_info`).
-
-**IR range** -- one read / index / publisher chain per sensor, one gate and one
-time splitter shared by all:
-
-```
-On Playback Tick -> Isaac Simulation Gate -> Isaac Read LightBeam Sensor
-    .Linear Depth Data -> Get Array Index (index 0) -> ROS2 Publisher .range
-Isaac Read Simulation Time -> Isaac Time Splitter
-    -> ROS2 Publisher .header:stamp:sec / .header:stamp:nanosec
-```
-
-On the ROS2 Publisher set `messagePackage = sensor_msgs`,
-`messageName = Range` first -- its `range`, `min_range`, ... inputs appear
-only after that -- then `topicName` and `header:frame_id`.
-
-**GPS** -- create an Xform under the robot body (e.g. `GPS_Antenna`) and move
-it to where the antenna sits. The script never moves it.
-
-```
-On Playback Tick -> Isaac Simulation Gate -> ROS2 Publisher
-Isaac Read World Pose (prim = the antenna Xform) .Translation
-    -> Break 3-Vector -> ROS2 Publisher .pose:position:x / y / z
-Isaac Read Simulation Time -> Isaac Time Splitter
-    -> ROS2 Publisher .header:stamp:sec / .header:stamp:nanosec
-```
-
-On the ROS2 Publisher set `messagePackage = geometry_msgs`,
-`messageName = PoseStamped`, `topicName`, `header:frame_id = world` and
-`pose:orientation:w = 1`.
+The Action Graph holds only what does not depend on the sensor model -- the
+nodes, their wiring, topic names and frame ids. Everything from the datasheet
+is set by the script. For IR range, set `messagePackage` and `messageName` on
+the graph's ROS2 Publisher before running the script; `min_range` and the
+other inputs it writes only appear after that.
 
 ### Update rates
 
@@ -210,7 +170,3 @@ vfov = 2 * atan(height / (2 * fy))
 | RGB camera | Intel RealSense D455, colour stream | 1280 x 720, 90 x 58.7 deg |
 | IR range | Sharp GP2Y0A02YK0F (x2) | 0.20-1.50 m, infrared, 26 Hz (30 Hz at 60 Hz ticks) |
 | Position | GPS / indoor positioning tag | 10 Hz |
-
-## Licence
-
-MIT

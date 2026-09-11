@@ -179,7 +179,7 @@ def main():
     print(" MEASURED")
     print("=" * 66)
     print(f"  output rate        {rate:8.1f} Hz     ({len(acc)} frames)")
-    acc_std = stats(acc, "acceleration", "m/s^2")
+    stats(acc, "acceleration", "m/s^2")
     gyr_std = stats(gyr, "angular velocity", "rad/s") if gyr else [0, 0, 0]
 
     mx, my, mz = (statistics.fmean(col(acc, i)) for i in range(3))
@@ -230,11 +230,9 @@ apply_imu(
     print("    * roll and pitch come from gravity and are only valid if the IMU")
     print("      was mounted the way it will be on the robot.  Yaw cannot be")
     print("      measured this way -- set it from how the IMU faces on the body.")
-    print(f"    * noise belongs in imu_realism.py, not here:")
-    print(f"          accel_noise={max(acc_std):.5f}   gyro_noise={max(gyr_std):.5f}")
     if max(gyr_std) == 0.0:
-        print("      The gyro reads exactly zero because the module zeroes it when it")
-        print("      decides it is still.  Its real noise cannot be measured this way.")
+        print("    * the gyro reads exactly zero because the module zeroes it when it")
+        print("      decides it is still.")
 
 
 if __name__ == "__main__":
